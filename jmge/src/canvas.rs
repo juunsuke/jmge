@@ -194,6 +194,68 @@ impl Canvas
 			x = x + self.draw_char(font, x, y, col, ch);
 		}
 	}
+
+	pub fn blit(&mut self, mut dx: i32, mut dy: i32, o: &Canvas, mut sx: i32, mut sy: i32, w: u32, h: u32)
+	{
+		// Clip the values
+		if w==0 || h==0
+			{ return; }
+
+		let dw = self.w as i32;
+		let dh = self.h as i32;
+		let sw = o.w as i32;
+		let sh = o.h as i32;
+		let mut w = w as i32;
+		let mut h = h as i32;
+
+		if dx>=dw || (dx+w)<=0		{ return; }
+		if dy>=dh || (dy+h)<=0		{ return; }
+
+		if sx>=sw || (sx+w)<=0		{ return; }
+		if sy>=sh || (sy+h)<=0		{ return; }
+
+		if (dx+w)>dw
+			{ w = dw-dx; }
+		if (dy+h)>dh
+			{ h = dh-dy; }
+
+		if (sx+w)>sw
+			{ w = sw-sx; }
+		if (sy+h)>sh
+			{ h = sh-sy; }
+
+		if dx<0
+		{
+			w += dx;
+			sx -= dx;
+			dx = 0;
+		}
+		if dy<0
+		{
+			h += dy;
+			sy -= dy;
+			dy = 0;
+		}
+
+		if sx<0
+		{
+			w += sx;
+			dx -= sx;
+			sx = 0;
+		}
+		if sy<0
+		{
+			h += sy;
+			dy -= sy;
+			sy = 0;
+		}
+
+		if w<=0 || h<=0
+			{ return; }
+
+		// Perform the blit
+
+	}
 }
 
 
