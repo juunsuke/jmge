@@ -1,5 +1,6 @@
 
 use super::{Error, Color, Font};
+use image::DynamicImage;
 
 
 pub struct Canvas
@@ -44,14 +45,9 @@ impl Canvas
 		cnv
 	}
 
-	pub fn from_file(fname: &str) -> Result<Canvas, Error>
+	pub fn from_image(img: DynamicImage) -> Result<Canvas, Error>
 	{
-		// Load an image file
-		let img = match image::open(&std::path::Path::new(fname))
-			{
-				Ok (i) => i,
-				Err (e) => return Err(Error::LoadImage(e.to_string())),
-			};
+		// Create a canvas from an image
 
 		// Convert it to RGBA
 		let img = img.to_rgba();
@@ -82,6 +78,30 @@ impl Canvas
 			};
 
 		Ok(cnv)
+	}
+
+	pub fn from_file(fname: &str) -> Result<Canvas, Error>
+	{
+		// Load an image file
+		let img = match image::open(&std::path::Path::new(fname))
+			{
+				Ok (i) => i,
+				Err (e) => return Err(Error::LoadImage(e.to_string())),
+			};
+
+		Canvas::from_image(img)
+	}
+
+	pub fn from_memory_file(buf: &[u8]) -> Result<Canvas, Error>
+	{
+		// Load an image
+		let img = match image::load_from_memory(buf)
+			{
+				Ok (i) => i,
+				Err (e) => return Err(Error::LoadImage(e.to_string())),
+			};
+
+		Canvas::from_image(img)
 	}
 
 	pub fn from_raw(w: u32, h: u32, data: Vec<u32>) -> Canvas

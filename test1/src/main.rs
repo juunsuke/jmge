@@ -1,5 +1,6 @@
 
 use jmge::*;
+use jmge::gui::*;
 use std::rc::Rc;
 use rand::Rng;
 
@@ -12,15 +13,43 @@ fn oops(e: Error) -> !
 
 fn main()
 {
+	let mut wnd = Window::new().unwrap_or_else(|e| oops(e));
+
+	let mut gui = Gui::new();
+
+	while !wnd.should_close()
+	{
+		wnd.poll_events();
+		gui.process_input(wnd.input());
+		
+		let kbd = wnd.keyboard();
+		if kbd.key_pressed(Key::Escape)
+		{
+			break;
+		}
+
+		wnd.clear(Color::rgb(0.3, 0.5, 1.0));
+		wnd.set_projection();
+		wnd.swap();
+	}
+}
+
+
+/*
+
+fn main()
+{
 	let mut rng = rand::thread_rng();
 
 	let mut wnd = Window::new().unwrap_or_else(|e| oops(e));
+
 
 	let mut atlas = TextureAtlas::new(2048);
 
 	//let kanade = Canvas::from_file("kanade2.png").unwrap();
 
-	let tex = Rc::new(atlas.add(Canvas::from_file("kanade2.png").unwrap_or_else(|e| oops(e))).unwrap_or_else(|e| oops(e)));
+	//let tex = Rc::new(atlas.add(Canvas::from_file("kanade2.png").unwrap_or_else(|e| oops(e))).unwrap_or_else(|e| oops(e)));
+	let tex = Rc::new(atlas.add(Canvas::from_memory_file(include_bytes!("../../kanade2.png")).unwrap_or_else(|e| oops(e))).unwrap_or_else(|e| oops(e)));
 	let tex2 = Rc::new(atlas.add(Canvas::from_file("kanade.png").unwrap_or_else(|e| oops(e))).unwrap_or_else(|e| oops(e)));
 
 	let mut cnv = Canvas::new(500, 200, Color::rgb(1.0, 0.6, 0.4));
@@ -105,7 +134,7 @@ fn main()
 		}
 
 		//tcnv.clear(Color::rgb(rng.gen_range(0.0, 1.0), rng.gen_range(0.0, 1.0), rng.gen_range(0.0, 1.0)));
-		tcnv.clear(Color::hsv(f as f32/1000.0, 1.0, 1.0));
+		tcnv.clear(Color::hsva(f as f32/1000.0, 1.0, 1.0, 0.5));
 		ttex.update(&tcnv);
 
 
@@ -117,4 +146,6 @@ fn main()
 		wnd.swap();
 	}
 }
+
+*/
 
