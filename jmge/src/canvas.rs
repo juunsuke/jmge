@@ -19,14 +19,29 @@ impl Canvas
 		if width==0 || height==0
 			{ panic!("Canvas::new(): width and height can't be zero"); }
 
-		let data = vec![col.0; (width*height) as usize];
+		let width = width as usize;
+		let height = height as usize;
 
-		Canvas
+		// Allocate the data
+		let mut data = Vec::with_capacity(width*height);
+
+		unsafe
 		{
-			w: width,
-			h: height,
-			data,
+			data.set_len(width*height);
 		}
+
+		// Create the canvas
+		let mut cnv = Canvas
+			{
+				w: width as u32,
+				h: height as u32,
+				data,
+			};
+
+		// Clear it
+		cnv.clear(col);
+
+		cnv
 	}
 
 	pub fn from_file(fname: &str) -> Result<Canvas, Error>
@@ -80,6 +95,25 @@ impl Canvas
 			w,
 			h,
 			data,
+		}
+	}
+
+	pub fn clear(&mut self, col: Color)
+	{
+		// Clear the canvas with the given color
+		unsafe
+		{
+			let sptr = self.data.as_ptr();
+			let mut dptr = self.data.as_mut_ptr() as *mut u32;
+
+			for x in 0..self.w as isize
+				{ *(dptr.offset(x)) = col.0; }
+				
+			for _ in 1..self.h as isize
+			{
+				dptr = dptr.offset(self.w as isize);
+				std::ptr::copy_nonoverlapping(sptr, dptr, self.w as usize);
+			}
 		}
 	}
 
@@ -195,7 +229,7 @@ impl Canvas
 		}
 	}
 
-	pub fn blit(&mut self, mut dx: i32, mut dy: i32, o: &Canvas, mut sx: i32, mut sy: i32, w: u32, h: u32)
+	pub fn blit(&mut self, mut dx: i32, mut dy: i32, o: &Canvas, mut sx: i32, mut sy: i32, w: u32, h: u32, alpha: bool)
 	{
 		// Clip the values
 		if w==0 || h==0
@@ -254,7 +288,44 @@ impl Canvas
 			{ return; }
 
 		// Perform the blit
+		let mut sptr = unsafe { o.data.as_ptr().offset((sy*sw+sx) as isize) };
+		let mut dptr = unsafe { self.data.as_mut_ptr().offset((dy*dw+dx) as isize) };
 
+		if alpha
+		{
+			// Copy pixel by pixel
+			for _ in 0..h
+			{
+				for x in 0..w
+				{
+					unsafe
+					{
+						let scol = Color { 0:*sptr.offset(x as isize) };
+						let dcol = Color { 0:*dptr.offset(x as isize) };
+						*dptr.offset(x as isize) = scol.blend(dcol).0;
+					}
+				}
+
+				unsafe
+				{
+					sptr = sptr.offset(sw as isize);
+					dptr = dptr.offset(dw as isize);
+				}
+			}
+		}
+		else
+		{
+			// Raw copy
+			for _ in 0..h
+			{
+				unsafe
+				{
+					std::ptr::copy_nonoverlapping(sptr, dptr, w as usize);
+					sptr = sptr.offset(sw as isize);
+					dptr = dptr.offset(dw as isize);
+				}
+			}
+		}
 	}
 }
 

@@ -26,6 +26,9 @@ pub use input::{Input, Mouse, Keyboard, Key};
 mod font;
 pub use font::{Font, Glyph};
 
+mod dod;
+pub use dod::{DataBin, DataBinHandle};
+
 pub mod gui;
 
 

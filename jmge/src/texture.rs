@@ -14,6 +14,12 @@ pub enum Texture
 
 impl Texture
 {
+	pub fn from_canvas(cnv: &Canvas) -> Texture
+	{
+		// Shortcut for creating a raw texture
+		Texture::Raw(RawTexture::from_canvas(cnv))
+	}
+
 	pub fn size(&self) -> (u32, u32)
 	{
 		// Return the texture size
@@ -59,6 +65,16 @@ impl Texture
 			Texture::AtlasEntry (ref entry) => entry.borrow().raw_tex.enable(),
 		}
 	}
+
+	pub fn update(&mut self, cnv: &Canvas)
+	{
+		// Update the texture if raw
+		match *self
+		{
+			Texture::Raw (ref mut raw) => raw.update(cnv),
+			_ => panic!("Texture.update(): only available for raw textures"),
+		}
+	}
 }
 
 
@@ -98,7 +114,7 @@ impl RawTexture
 		}
 	}
 
-	pub fn from_canvas(cnv: &Canvas) -> Result<RawTexture, Error>
+	pub fn from_canvas(cnv: &Canvas) -> RawTexture
 	{
 		// Get the size
 		let (w, h) = cnv.size();
@@ -113,7 +129,7 @@ impl RawTexture
 			gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as i32, w as i32, h as i32, 0, gl::RGBA, gl::UNSIGNED_BYTE, ptr as *const std::os::raw::c_void);
 		}
 
-		Ok(tex)
+		tex
 	}
 
 	pub fn from_file(fname: &str) -> Result<RawTexture, Error>
@@ -121,7 +137,7 @@ impl RawTexture
 		// Load the file into a canvas and create a texture from it
 		let cnv = Canvas::from_file(fname)?;
 
-		RawTexture::from_canvas(&cnv)
+		Ok(RawTexture::from_canvas(&cnv))
 	}
 
 	pub fn size(&self) -> (u32, u32)
@@ -136,6 +152,24 @@ impl RawTexture
 		{
 			gl::BindTexture(gl::TEXTURE_2D, self.id);
 		}
+	}
+
+	pub fn update(&mut self, cnv: &Canvas)
+	{
+		// Bind the texture
+		self.enable();
+
+		// Update the data
+		let (w, h) = cnv.size();
+		
+		unsafe
+		{
+			let ptr = cnv.data().as_ptr();
+			gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as i32, w as i32, h as i32, 0, gl::RGBA, gl::UNSIGNED_BYTE, ptr as *const std::os::raw::c_void);
+		}
+
+		self.w = w;
+		self.h = h;
 	}
 }
 

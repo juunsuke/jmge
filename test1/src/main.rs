@@ -18,6 +18,8 @@ fn main()
 
 	let mut atlas = TextureAtlas::new(2048);
 
+	//let kanade = Canvas::from_file("kanade2.png").unwrap();
+
 	let tex = Rc::new(atlas.add(Canvas::from_file("kanade2.png").unwrap_or_else(|e| oops(e))).unwrap_or_else(|e| oops(e)));
 	let tex2 = Rc::new(atlas.add(Canvas::from_file("kanade.png").unwrap_or_else(|e| oops(e))).unwrap_or_else(|e| oops(e)));
 
@@ -64,6 +66,14 @@ fn main()
 	sprites[99].borrow_mut().set_origin(0, 0);
 
 
+	let mut tcnv = Canvas::new(1024, 768, Color::rgb(0.2, 0.2, 0.2));
+	let ttex = Rc::new(Texture::Raw(RawTexture::from_canvas(&tcnv)));
+	let mut sp = Sprite::new(&Rc::clone(&ttex));
+	sp.set_pos(100, 10);
+
+	let _sp = sb.add(sp);
+
+
 	let mut f: u32 = 0;
 
 	while !wnd.should_close()
@@ -87,11 +97,16 @@ fn main()
 			sprites[99].borrow_mut().set_pos(x, y);
 		}
 
+	
 		let kbd = wnd.keyboard();
 		if kbd.key_pressed(Key::Escape)
 		{
 			break;
 		}
+
+		tcnv.clear(Color::rgb(rng.gen_range(0.0, 1.0), rng.gen_range(0.0, 1.0), rng.gen_range(0.0, 1.0)));
+		//ttex.update(&tcnv);
+
 
 		wnd.clear(Color::rgb(0.3, 0.5, 1.0));
 

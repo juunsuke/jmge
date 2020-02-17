@@ -49,7 +49,7 @@ impl Window
 		// Setup OpenGL
 		gl::load_with(|s| glfw.get_proc_address_raw(s));
 
-		glfw.set_swap_interval(glfw::SwapInterval::None);
+		//glfw.set_swap_interval(glfw::SwapInterval::None);
 
 		unsafe
 		{
