@@ -7,7 +7,7 @@ use std::cell::RefCell;
 
 pub enum Texture
 {
-	Raw (RawTexture),
+	Raw (RefCell<RawTexture>),
 	AtlasEntry (Rc<RefCell<AtlasEntry>>),
 }
 
@@ -17,7 +17,7 @@ impl Texture
 	pub fn from_canvas(cnv: &Canvas) -> Texture
 	{
 		// Shortcut for creating a raw texture
-		Texture::Raw(RawTexture::from_canvas(cnv))
+		Texture::Raw(RefCell::new(RawTexture::from_canvas(cnv)))
 	}
 
 	pub fn size(&self) -> (u32, u32)
@@ -25,7 +25,7 @@ impl Texture
 		// Return the texture size
 		match *self
 		{
-			Texture::Raw (ref raw) => (raw.w, raw.h),
+			Texture::Raw (ref raw) => raw.borrow().size(),
 			Texture::AtlasEntry (ref entry) => entry.borrow().cnv.size(),
 		}
 	}
@@ -35,7 +35,7 @@ impl Texture
 		// Return the underlying raw texture
 		match *self
 		{
-			Texture::Raw (ref raw) => raw.id,
+			Texture::Raw (ref raw) => raw.borrow().id,
 			Texture::AtlasEntry (ref entry) => entry.borrow().raw_tex.id,
 		}
 	}
@@ -61,18 +61,18 @@ impl Texture
 		// Enable the underyling raw texture
 		match *self
 		{
-			Texture::Raw (ref raw) => raw.enable(),
+			Texture::Raw (ref raw) => raw.borrow().enable(),
 			Texture::AtlasEntry (ref entry) => entry.borrow().raw_tex.enable(),
 		}
 	}
 
-	pub fn update(&mut self, cnv: &Canvas)
+	pub fn update(&self, cnv: &Canvas)
 	{
-		// Update the texture if raw
+		// Update the texture
 		match *self
 		{
-			Texture::Raw (ref mut raw) => raw.update(cnv),
-			_ => panic!("Texture.update(): only available for raw textures"),
+			Texture::Raw (ref raw) => raw.borrow_mut().update(cnv),
+			Texture::AtlasEntry (_) => panic!("Texture.update(): Entries in texture a texture atlas cannot be updated"),
 		}
 	}
 }

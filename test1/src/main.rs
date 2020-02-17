@@ -66,8 +66,8 @@ fn main()
 	sprites[99].borrow_mut().set_origin(0, 0);
 
 
-	let mut tcnv = Canvas::new(1024, 768, Color::rgb(0.2, 0.2, 0.2));
-	let ttex = Rc::new(Texture::Raw(RawTexture::from_canvas(&tcnv)));
+	let mut tcnv = Canvas::new(512, 384, Color::rgb(0.2, 0.2, 0.2));
+	let ttex = Rc::new(Texture::from_canvas(&tcnv));
 	let mut sp = Sprite::new(&Rc::clone(&ttex));
 	sp.set_pos(100, 10);
 
@@ -104,8 +104,9 @@ fn main()
 			break;
 		}
 
-		tcnv.clear(Color::rgb(rng.gen_range(0.0, 1.0), rng.gen_range(0.0, 1.0), rng.gen_range(0.0, 1.0)));
-		//ttex.update(&tcnv);
+		//tcnv.clear(Color::rgb(rng.gen_range(0.0, 1.0), rng.gen_range(0.0, 1.0), rng.gen_range(0.0, 1.0)));
+		tcnv.clear(Color::hsv(f as f32/1000.0, 1.0, 1.0));
+		ttex.update(&tcnv);
 
 
 		wnd.clear(Color::rgb(0.3, 0.5, 1.0));

@@ -41,6 +41,31 @@ impl Color
 		Color::rgba8(r, g, b, 255)
 	}
 
+	pub fn hsva(h: f32, s: f32, v: f32, a: f32) -> Color
+	{
+		// Convert HSV to RGB
+		let h = (h*360.0)%360.0;
+		let c = v*s;
+		let m = v-c;
+		let x = c*(1.0-((h/60.0)%2.0 - 1.0).abs());
+
+		let cm = c+m;
+		let xm = x+m;
+
+		if h<60.0		{ return Color::rgba(cm, xm, m,  a) }
+		if h<120.0		{ return Color::rgba(xm, cm, m,  a) }
+		if h<180.0		{ return Color::rgba(m,  cm, xm, a) }
+		if h<240.0		{ return Color::rgba(m,  xm, cm, a) }
+		if h<300.0		{ return Color::rgba(xm, m,  cm, a) }
+
+		Color::rgba(cm, m,  xm, a)
+	}
+
+	pub fn hsv(h: f32, s: f32, v: f32) -> Color
+	{
+		Color::hsva(h, s, v, 1.0)
+	}
+
 	pub fn a8(&self) -> u8 { ((self.0>>24) & 0xFF) as u8 }
 	pub fn b8(&self) -> u8 { ((self.0>>16) & 0xFF) as u8 }
 	pub fn g8(&self) -> u8 { ((self.0>>8) & 0xFF) as u8 }
