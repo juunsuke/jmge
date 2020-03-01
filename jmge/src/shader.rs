@@ -1,5 +1,5 @@
 
-use std::ffi::{CString, CStr};
+use std::ffi::{CString};
 use super::Error;
 use nalgebra::base::{Matrix4};
 
@@ -12,37 +12,20 @@ fn space_cstring(len: usize) -> CString
 	unsafe { CString::from_vec_unchecked(buffer) }
 }
 
-enum ShaderType
-{
-	Vertex,
-	Fragment,
-}
+struct Shader (u32);
 
-struct ShaderPart
+impl Shader
 {
-	id: u32
-}
-
-impl ShaderPart
-{
-	pub fn from_string(source: &str, stype: ShaderType) -> Result<ShaderPart, Error>
+	fn from_bytes(source: &[u8], stype: u32) -> Result<Shader, Error>
 	{
-		// Convert the string to a C string
-		let source: &CStr = &CString::new(source).unwrap();
-
-		// Create a new shader
-		let stype = match stype
-			{
-				ShaderType::Vertex => gl::VERTEX_SHADER,
-				ShaderType::Fragment => gl::FRAGMENT_SHADER
-			};
 		let id = unsafe { gl::CreateShader(stype) };
-		let shader = ShaderPart { id };
+		let shader = Shader (id);
 
 		unsafe
 		{
 			// Compile the shader
-			gl::ShaderSource(id, 1, &source.as_ptr(), std::ptr::null());
+			let len = source.len() as i32;
+			gl::ShaderSource(id, 1, &(source.as_ptr() as *const i8), &len);
 			gl::CompileShader(id);
 		
 			// Check success
@@ -65,49 +48,70 @@ impl ShaderPart
 		Ok(shader)
 	}
 
-	pub fn from_string_vertex(source: &str) -> Result<ShaderPart, Error>
+	pub fn id(&self) -> u32
 	{
-		ShaderPart::from_string(source, ShaderType::Vertex)
-	}
-
-	pub fn from_string_fragment(source: &str) -> Result<ShaderPart, Error>
-	{
-		ShaderPart::from_string(source, ShaderType::Fragment)
+		self.0
 	}
 }
 
-impl Drop for ShaderPart
+impl Drop for Shader
 {
 	fn drop(&mut self)
 	{
 		// Delete the shader
-		unsafe { gl::DeleteShader(self.id); }
+		unsafe { gl::DeleteShader(self.0); }
+	}
+}
+
+pub struct VertexShader (Shader);
+
+impl VertexShader
+{
+	pub fn from_bytes(source: &[u8]) -> Result<VertexShader, Error>
+	{
+		let shader = Shader::from_bytes(source, gl::VERTEX_SHADER)?;
+		Ok(VertexShader (shader))
+	}
+
+	pub fn id(&self) -> u32
+	{
+		self.0.id()
 	}
 }
 
 
-pub struct Shader
+pub struct FragmentShader (Shader);
+
+impl FragmentShader
 {
-	id: u32,
+	pub fn from_bytes(source: &[u8]) -> Result<FragmentShader, Error>
+	{
+		let shader = Shader::from_bytes(source, gl::FRAGMENT_SHADER)?;
+		Ok(FragmentShader (shader))
+	}
+
+	pub fn id(&self) -> u32
+	{
+		self.0.id()
+	}
 }
 
-impl Shader
-{
-	pub fn new(vert: &str, frag: &str) -> Result<Shader, Error>
-	{
-		// Create and compile both shader parts
-		let vert = ShaderPart::from_string_vertex(vert)?;
-		let frag = ShaderPart::from_string_fragment(frag)?;
 
+pub struct ShaderProgram (u32);
+
+impl ShaderProgram
+{
+	pub fn new(vert: VertexShader, frag: FragmentShader) -> Result<ShaderProgram, Error>
+	{
 		// Create the program
 		let id = unsafe { gl::CreateProgram() };
-		let shader = Shader { id };
+		let prg = ShaderProgram (id);
 
 		unsafe
 		{
 			// Link the program
-			gl::AttachShader(id, vert.id);
-			gl::AttachShader(id, frag.id);
+			gl::AttachShader(id, vert.id());
+			gl::AttachShader(id, frag.id());
 			gl::LinkProgram(id);
 
 			// Check success
@@ -128,12 +132,26 @@ impl Shader
 
 		}
 
-		Ok(shader)
+		Ok(prg)
 	}
 
-	pub fn new_default() -> Result<Shader, Error>
+	pub fn from_str(vert: &str, frag: &str) -> Result<ShaderProgram, Error>
 	{
-		Shader::new(include_str!("../shaders/def.vert"), include_str!("../shaders/def.frag"))
+		// Create and compile both shader parts
+		let vert = VertexShader::from_bytes(vert.as_bytes())?;
+		let frag = FragmentShader::from_bytes(frag.as_bytes())?;
+
+		ShaderProgram::new(vert, frag)
+	}
+
+	pub fn new_default() -> Result<ShaderProgram, Error>
+	{
+		ShaderProgram::from_str(include_str!("../shaders/def.vert"), include_str!("../shaders/def.frag"))
+	}
+	
+	pub fn id(&self) -> u32
+	{
+		self.0
 	}
 
 	pub fn enable(&self)
@@ -141,7 +159,7 @@ impl Shader
 		// Enable the shader program
 		unsafe
 		{
-			gl::UseProgram(self.id);
+			gl::UseProgram(self.0);
 		}
 	}
 
@@ -150,7 +168,7 @@ impl Shader
 		// Find the uniform and set it
 		unsafe
 		{
-			let uni = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_bytes_with_nul().as_ptr() as *const i8);
+			let uni = gl::GetUniformLocation(self.0, CString::new(name).unwrap().as_bytes_with_nul().as_ptr() as *const i8);
 
 			if uni<0
 				{ panic!("set_uniform_matrix(): Uniform '{}' not found", name); }
@@ -160,15 +178,15 @@ impl Shader
 	}
 }
 
-impl Drop for Shader
+impl Drop for ShaderProgram
 {
 	fn drop(&mut self)
 	{
-		if self.id!=0
+		if self.0!=0
 		{
 			unsafe
 			{
-				gl::DeleteProgram(self.id);
+				gl::DeleteProgram(self.0);
 			}
 		}
 	}

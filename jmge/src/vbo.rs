@@ -1,4 +1,6 @@
 
+use std::ops::{Deref, DerefMut};
+
 
 #[repr(C)]
 pub struct Vertex
@@ -20,17 +22,90 @@ pub struct Vertex
 const VERTEX_SIZE:usize = 48;
 
 
-pub struct VertexBuffer
+pub struct MapGuard<T>
+{
+	ptr: *mut T,
+	len: usize,
+}
+
+impl<T> Drop for MapGuard<T>
+{
+	fn drop(&mut self)
+	{
+		// Unmap and unbind
+		unsafe
+		{
+			gl::UnmapBuffer(gl::ARRAY_BUFFER);
+			gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+		}
+	}
+}
+
+impl<T> MapGuard<T>
+{
+	pub fn ptr(&self) -> *mut T
+	{
+		self.ptr
+	}
+/*
+	pub fn get(&self, index: usize) -> &mut T
+	{
+		unsafe
+		{
+			let ptr = self.ptr.offset(index as isize);
+			let r: &mut T = &mut *ptr;
+
+			r
+		}
+	}
+
+	pub fn slice(&self, start: usize, count: usize) -> &mut [T]
+	{
+		unsafe
+		{
+			let ptr = self.ptr.offset(start as isize);
+			std::slice::from_raw_parts_mut(ptr, count)
+		}
+	}*/
+}
+
+impl<T> Deref for MapGuard<T>
+{
+	type Target = [T];
+
+	fn deref(&self) -> &[T]
+	{
+		unsafe
+		{
+			std::slice::from_raw_parts(self.ptr, self.len)
+		}
+	}
+}
+
+impl<T> DerefMut for MapGuard<T>
+{
+	fn deref_mut(&mut self) -> &mut [T]
+	{
+		unsafe
+		{
+			std::slice::from_raw_parts_mut(self.ptr, self.len)
+		}
+	}
+}
+
+
+pub struct VertexBuffer<T>
 {
 	vbo: u32,
 	vao: u32,
 	vbo_size: usize,
+	phantom: std::marker::PhantomData<T>,
 }
 
-impl VertexBuffer
+impl<T> VertexBuffer<T>
 {
 
-	pub fn new() -> VertexBuffer
+	pub fn new() -> VertexBuffer<T>
 	{
 		let mut vbo = 0;
 		let mut vao = 0;
@@ -86,32 +161,39 @@ impl VertexBuffer
 				vbo,
 				vao,
 				vbo_size,
+				phantom: std::marker::PhantomData,
 			}
 	}
 
-	pub unsafe fn map(&mut self, first: usize, count: usize) -> *mut Vertex
+	pub fn map(&mut self, count: usize) -> MapGuard<T>
 	{
 		// Bind the buffer
-		gl::BindBuffer(gl::ARRAY_BUFFER, self.vbo);
+		unsafe
+		{
+			gl::BindBuffer(gl::ARRAY_BUFFER, self.vbo);
+		}
 			
 		// Make sure the buffer is big enough
-		if first+count > self.vbo_size
+		if count > self.vbo_size
 		{
 			// Resize it
-			self.vbo_size = first+count;
+			self.vbo_size = count;
 
-			gl::BufferData(gl::ARRAY_BUFFER, (self.vbo_size*VERTEX_SIZE) as isize, std::ptr::null(), gl::STREAM_DRAW);
+			unsafe
+			{
+				gl::BufferData(gl::ARRAY_BUFFER, (self.vbo_size*VERTEX_SIZE) as isize, std::ptr::null(), gl::STREAM_DRAW);
+			}
 		}
 
-		// Map the region and return the pointer
-		gl::MapBufferRange(gl::ARRAY_BUFFER, (first*VERTEX_SIZE) as isize, (count*VERTEX_SIZE) as isize, gl::MAP_WRITE_BIT+gl::MAP_INVALIDATE_RANGE_BIT) as *mut Vertex
-	}
+		// Map the region
+		let flags = gl::MAP_WRITE_BIT+gl::MAP_INVALIDATE_RANGE_BIT;
+		let ptr = unsafe { gl::MapBufferRange(gl::ARRAY_BUFFER, 0, (count*VERTEX_SIZE) as isize, flags) };
 
-	pub unsafe fn unmap(&self)
-	{
-		// Unmap and unbind
-		gl::UnmapBuffer(gl::ARRAY_BUFFER);
-		gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+		MapGuard
+		{
+			ptr: ptr as *mut T,
+			len: count,
+		}
 	}
 
 	pub fn draw_triangles(&self, first: u32, count: u32)
@@ -131,7 +213,7 @@ impl VertexBuffer
 
 }
 
-impl Drop for VertexBuffer
+impl<T> Drop for VertexBuffer<T>
 {
 	fn drop(&mut self)
 	{

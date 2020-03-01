@@ -18,6 +18,14 @@ fn shift(v: u8, c:u8) -> u32
 }
 
 
+impl From<u32> for Color
+{
+	fn from(item: u32) -> Color
+	{
+		Color (item)
+	}
+}
+
 impl Color
 {
 
@@ -33,7 +41,7 @@ impl Color
 
 	pub fn rgba8(r: u8, g: u8, b: u8, a: u8) -> Color
 	{
-		Color { 0: shift(a, 24) | shift(b, 16) | shift(g, 8) | (r as u32) }
+		Color (shift(a, 24) | shift(b, 16) | shift(g, 8) | (r as u32))
 	}
 
 	pub fn rgb8(r: u8, g: u8, b: u8) -> Color
@@ -106,5 +114,11 @@ impl Color
 
 		Color::rgba8(r as u8, g as u8, b as u8, a as u8)
 	}
+
+	pub fn as_u32(&self) -> u32
+	{
+		self.0
+	}
 }
+
 

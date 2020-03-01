@@ -1,5 +1,5 @@
 
-use super::{Color, Shader, Error, Input, Mouse, Keyboard};
+use super::{Color, ShaderProgram, Error, Input, Mouse, Keyboard};
 use glfw::{Context, WindowEvent};
 use nalgebra::base::Matrix4;
 use std::time::{Instant};
@@ -7,7 +7,7 @@ use std::time::{Instant};
 pub struct Window
 {
 	proj_mat: Matrix4<f32>,
-	shader: Shader,
+	shader: ShaderProgram,
 
 	input: Input,
 
@@ -66,7 +66,7 @@ impl Window
 		// Prepare the projection matrix
 		let proj_mat = calc_proj(w as f32, h as f32);
 
-		let shader = Shader::new_default()?;
+		let shader = ShaderProgram::new_default()?;
 		shader.enable();
 
 		let wnd = Window

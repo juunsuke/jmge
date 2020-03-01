@@ -6,7 +6,7 @@ mod window;
 pub use window::Window;
 
 mod shader;
-pub use shader::Shader;
+pub use shader::{VertexShader, FragmentShader, ShaderProgram};
 
 mod vbo;
 pub use vbo::{VertexBuffer, Vertex};
@@ -26,7 +26,12 @@ pub use input::{Input, Mouse, Keyboard, Key};
 mod font;
 pub use font::{Font, Glyph};
 
-pub mod gui;
+mod renderer;
+pub use renderer::{Renderer, Quad};
+
+pub mod ecs;
+
+//pub mod gui;
 
 
 #[derive(Debug)]

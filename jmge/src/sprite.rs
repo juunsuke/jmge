@@ -19,24 +19,21 @@ pub struct SpriteMetrics
 	pub oy: i32,
 }
 
-unsafe fn write_vertex(vtx: *mut Vertex, sm: &SpriteMetrics, x: f32, y: f32, u: f32, v: f32) -> *mut Vertex
+fn write_vertex(vtx: &mut Vertex, sm: &SpriteMetrics, x: f32, y: f32, u: f32, v: f32)
 {
 	// Write vertex data
-	(*vtx).x = x;
-	(*vtx).y = y;
-	(*vtx).col = sm.col.0;
-	(*vtx).u = u;
-	(*vtx).v = v;
-	(*vtx).tx = sm.x as f32;
-	(*vtx).ty = sm.y as f32;
-	(*vtx).sx = sm.sx;
-	(*vtx).sy = sm.sy;
-	(*vtx).angle = sm.angle;
-	(*vtx).ox = -sm.ox as f32;
-	(*vtx).oy = -sm.oy as f32;
-
-	// Return a pointer to the next vertex
-	vtx.offset(1)
+	vtx.x = x;
+	vtx.y = y;
+	vtx.col = sm.col.0;
+	vtx.u = u;
+	vtx.v = v;
+	vtx.tx = sm.x as f32;
+	vtx.ty = sm.y as f32;
+	vtx.sx = sm.sx;
+	vtx.sy = sm.sy;
+	vtx.angle = sm.angle;
+	vtx.ox = -sm.ox as f32;
+	vtx.oy = -sm.oy as f32;
 }
 
 impl SpriteMetrics
@@ -60,7 +57,7 @@ impl SpriteMetrics
 		}
 	}
 
-	pub unsafe fn write_vertices(&self, mut v: *mut Vertex, uv: (f32, f32, f32, f32)) -> *mut Vertex
+	pub fn write_vertices(&self, v: &mut [Vertex], uv: (f32, f32, f32, f32))
 	{
 		let x1 = 0.0;
 		let y1 = 0.0;
@@ -69,16 +66,14 @@ impl SpriteMetrics
 		let (u1, v1, u2, v2) = uv;
 
 		// First triangle
-		v = write_vertex(v, self, x1, y1, u1, v1);
-		v = write_vertex(v, self, x2, y1, u2, v1);
-		v = write_vertex(v, self, x1, y2, u1, v2);
+		write_vertex(&mut v[0], self, x1, y1, u1, v1);
+		write_vertex(&mut v[1], self, x2, y1, u2, v1);
+		write_vertex(&mut v[2], self, x1, y2, u1, v2);
 
 		// Second triangle
-		v = write_vertex(v, self, x2, y1, u2, v1);
-		v = write_vertex(v, self, x2, y2, u2, v2);
-		v = write_vertex(v, self, x1, y2, u1, v2);
-
-		v
+		write_vertex(&mut v[3], self, x2, y1, u2, v1);
+		write_vertex(&mut v[4], self, x2, y2, u2, v2);
+		write_vertex(&mut v[5], self, x1, y2, u1, v2);
 	}
 
 	pub fn calc_transform_matrix(&self) -> Matrix4<f32>
@@ -202,7 +197,7 @@ impl Sprite
 pub struct SpriteBatch
 {
 	sprites: Vec<Weak<RefCell<Sprite>>>,
-	vbo: VertexBuffer,
+	vbo: VertexBuffer<Vertex>,
 }
 
 struct DrawBatch
@@ -239,76 +234,71 @@ impl SpriteBatch
 		// Remove all the dead sprites
 		self.sprites.retain(|sp| sp.strong_count()>0);
 
-		// Map the VBO, large enough for all the sprites
-		let mut vtx = unsafe { self.vbo.map(0, self.sprites.len()*6) };
-
 		// Prepare batching
 		let mut last_tex: Option<Rc<Texture>> = None;
 		let mut batches = Vec::new();
 		let mut pos = 0;
 		let mut start = 0;
 
-		// Iterate through all the sprites
-		for sp in self.sprites.iter()
 		{
-			let spcell = sp.upgrade().unwrap();
-			let sp = spcell.borrow();
+			// Map the VBO, large enough for all the sprites
+			//let mut vtx = unsafe { self.vbo.map(0, self.sprites.len()*6) };
+			let mut map = self.vbo.map(self.sprites.len()*6);
 
-			if sp.visible
+			// Iterate through all the sprites
+			for sp in self.sprites.iter()
 			{
-				// Create a new draw batch if the texture is different
-				if let Some(ref tex) = last_tex
+				let spcell = sp.upgrade().unwrap();
+				let sp = spcell.borrow();
+
+				if sp.visible
 				{
-					if !tex.is_same(&sp.tex)
+					// Create a new draw batch if the texture is different
+					if let Some(ref tex) = last_tex
 					{
-						let batch = DrawBatch
-							{
-								tex: Rc::clone(tex),
-								first: start,
-								count: pos-start,
-							};
+						if !tex.is_same(&sp.tex)
+						{
+							let batch = DrawBatch
+								{
+									tex: Rc::clone(tex),
+									first: start,
+									count: pos-start,
+								};
 
-						batches.push(batch);
+							batches.push(batch);
 
-						// Start a new one
-						last_tex = Some(Rc::clone(&sp.tex));
-						start = pos;
+							// Start a new one
+							last_tex = Some(Rc::clone(&sp.tex));
+							start = pos;
+						}
 					}
-				}
-				else
-				{
-					// First one
-					last_tex = Some(Rc::clone(&sp.tex));
-				}
+					else
+					{
+						// First one
+						last_tex = Some(Rc::clone(&sp.tex));
+					}
 
-				// Write the vertices
-				unsafe
-				{
-					vtx = sp.metrics.write_vertices(vtx, sp.tex.uv());
-				}
+					// Write the vertices
+					//sp.metrics.write_vertices(map.slice(pos as usize*6, 6), sp.tex.uv());
+					sp.metrics.write_vertices(&mut map[pos as usize*6..(pos+1) as usize*6], sp.tex.uv());
 
-				// Move on
-				pos += 1;
+					// Move on
+					pos += 1;
+				}
 			}
-		}
 
-		// Create the final batch
-		if let Some(ref tex) = last_tex
-		{
-			let batch = DrawBatch
-				{
-					tex: Rc::clone(tex),
-					first: start,
-					count: pos-start,
-				};
+			// Create the final batch
+			if let Some(ref tex) = last_tex
+			{
+				let batch = DrawBatch
+					{
+						tex: Rc::clone(tex),
+						first: start,
+						count: pos-start,
+					};
 
-			batches.push(batch);
-		}
-
-		// Unmap
-		unsafe
-		{
-			self.vbo.unmap();
+				batches.push(batch);
+			}
 		}
 
 		// Draw all the batches

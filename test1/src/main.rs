@@ -1,8 +1,9 @@
 
 use jmge::*;
-use jmge::gui::*;
+//use jmge::gui::*;
 use std::rc::Rc;
 use rand::Rng;
+use std::any::Any;
 
 
 fn oops(e: Error) -> !
@@ -11,16 +12,106 @@ fn oops(e: Error) -> !
 	std::process::exit(1);
 }
 
+
+struct Sprite
+{
+	x: i32,
+	y: i32,
+	angle: f32,
+	tex: Rc<Texture>,
+}
+
+
+fn load_canvases() -> (Canvas, Canvas)
+{
+	let c1 = Canvas::from_memory_file(include_bytes!("../../kanade.png")).unwrap_or_else(|e| oops(e));
+	let c2 = Canvas::from_memory_file(include_bytes!("../../kanade2.png")).unwrap_or_else(|e| oops(e));
+
+	(c1, c2)
+}
+
+pub struct Position
+{
+	pub x: f32,
+	pub y: f32,
+}
+
+impl ecs::Component for Position
+{
+	fn as_any(&self) -> &dyn Any				{ self }
+	fn as_any_mut(&mut self) -> &mut dyn Any	{ self }
+}
+
+pub struct Transform
+{
+	pub angle: f32,
+	pub sx: f32,
+	pub sy: f32,
+}
+
+impl ecs::Component for Transform
+{
+	fn as_any(&self) -> &dyn Any				{ self }
+	fn as_any_mut(&mut self) -> &mut dyn Any	{ self }
+}
+
+
 fn main()
 {
 	let mut wnd = Window::new().unwrap_or_else(|e| oops(e));
+	let mut rend = Renderer::new().unwrap_or_else(|e| oops(e));
 
-	let mut gui = Gui::new();
+	let (_cnv1, cnv2) = load_canvases();
+
+	let mut atlas = TextureAtlas::new(2048);
+	let tex = Rc::new(atlas.add(cnv2).unwrap_or_else(|e| oops(e)));
+
+
+
+
+	let world = ecs::World::new();
+	world.register_component::<Position>();
+	world.register_component::<Transform>();
+
+
+	let e = world.new_entity();
+
+	let p = Position { x: 100.0, y: 200.0 };
+	e.set_component(p);
+
+	let pos = e.get_component::<Position>();
+	println!("{},{}", pos.x, pos.y);
+	std::mem::drop(pos);
+
+	e.get_component_mut::<Position>().x = 300.0;
+
+
+	world.iter_with(|pos: &Position| println!("Pos: {}, {}", pos.x, pos.y));
+
+
+	let mut sprites = Vec::new();
+
+	let mut rng = rand::thread_rng();
+	for _ in 0..100
+	{
+		let sp = Sprite
+			{
+				x: rng.gen_range(0, 1920),
+				y: rng.gen_range(0, 1080),
+				angle: 0.0,
+				tex: Rc::clone(&tex),
+			};
+
+		sprites.push(sp);
+	}
+
+	let mut f = 0.0;
 
 	while !wnd.should_close()
 	{
+		f += 1.0;
+
 		wnd.poll_events();
-		gui.process_input(wnd.input());
 		
 		let kbd = wnd.keyboard();
 		if kbd.key_pressed(Key::Escape)
@@ -28,15 +119,35 @@ fn main()
 			break;
 		}
 
+		for sp in sprites.iter_mut()
+		{
+			sp.angle = f / 100.0;
+		}
+
+		for sp in sprites.iter()
+		{
+			let (w, h) = sp.tex.size();
+
+			let quad = Quad::new(&sp.tex)
+				.with_pos(sp.x as f32, sp.y as f32)
+				.with_angle(sp.angle)
+				.with_origin(w as f32/2.0, h as f32/2.0);
+
+			rend.add_quad(quad);
+		}
+
 		wnd.clear(Color::rgb(0.3, 0.5, 1.0));
 		wnd.set_projection();
+
+		rend.render();
+
 		wnd.swap();
 	}
 }
 
 
-/*
 
+/*
 fn main()
 {
 	let mut rng = rand::thread_rng();
@@ -146,6 +257,6 @@ fn main()
 		wnd.swap();
 	}
 }
-
 */
+
 
