@@ -1,24 +1,13 @@
 
 use jmge::*;
-//use jmge::gui::*;
 use std::rc::Rc;
 use rand::Rng;
-use std::any::Any;
 
 
 fn oops(e: Error) -> !
 {
 	println!("Fatal error: {}", e.to_string());
 	std::process::exit(1);
-}
-
-
-struct Sprite
-{
-	x: i32,
-	y: i32,
-	angle: f32,
-	tex: Rc<Texture>,
 }
 
 
@@ -30,30 +19,9 @@ fn load_canvases() -> (Canvas, Canvas)
 	(c1, c2)
 }
 
-pub struct Position
-{
-	pub x: f32,
-	pub y: f32,
-}
 
-impl ecs::Component for Position
-{
-	fn as_any(&self) -> &dyn Any				{ self }
-	fn as_any_mut(&mut self) -> &mut dyn Any	{ self }
-}
-
-pub struct Transform
-{
-	pub angle: f32,
-	pub sx: f32,
-	pub sy: f32,
-}
-
-impl ecs::Component for Transform
-{
-	fn as_any(&self) -> &dyn Any				{ self }
-	fn as_any_mut(&mut self) -> &mut dyn Any	{ self }
-}
+#[derive(Component)]
+struct RotSpeed (f32);
 
 
 fn main()
@@ -69,40 +37,29 @@ fn main()
 
 
 
-	let world = ecs::World::new();
-	world.register_component::<Position>();
-	world.register_component::<Transform>();
+	let mut world = World::new();
+	world.register::<Renderable>();
+	world.register::<RotSpeed>();
 
 
-	let e = world.new_entity();
+	let (tw, th) = tex.size();
 
-	let p = Position { x: 100.0, y: 200.0 };
-	e.set_component(p);
-
-	let pos = e.get_component::<Position>();
-	println!("{},{}", pos.x, pos.y);
-	std::mem::drop(pos);
-
-	e.get_component_mut::<Position>().x = 300.0;
-
-
-	world.iter_with(|pos: &Position| println!("Pos: {}, {}", pos.x, pos.y));
-
-
-	let mut sprites = Vec::new();
+	let mut ents = Vec::new();
 
 	let mut rng = rand::thread_rng();
 	for _ in 0..100
 	{
-		let sp = Sprite
-			{
-				x: rng.gen_range(0, 1920),
-				y: rng.gen_range(0, 1080),
-				angle: 0.0,
-				tex: Rc::clone(&tex),
-			};
+		let ent = world.new_entity();
 
-		sprites.push(sp);
+		let mut r = Renderable::new(&tex, rng.gen_range(0, 1920), rng.gen_range(0, 1080));
+		r.x_origin = tw as i32/2;
+		r.y_origin = th as i32/2;
+
+		world.set(&ent, r);
+
+		world.set(&ent, RotSpeed(rng.gen_range(0.5, 4.0)));
+
+		ents.push(ent);
 	}
 
 	let mut f = 0.0;
@@ -110,6 +67,12 @@ fn main()
 	while !wnd.should_close()
 	{
 		f += 1.0;
+
+		for (e, mut r) in world.iter_mut::<Renderable>()
+		{
+			let rs = world.get::<RotSpeed>(&e).0;
+			r.angle = f*rs/100.0;
+		}
 
 		wnd.poll_events();
 		
@@ -119,22 +82,7 @@ fn main()
 			break;
 		}
 
-		for sp in sprites.iter_mut()
-		{
-			sp.angle = f / 100.0;
-		}
-
-		for sp in sprites.iter()
-		{
-			let (w, h) = sp.tex.size();
-
-			let quad = Quad::new(&sp.tex)
-				.with_pos(sp.x as f32, sp.y as f32)
-				.with_angle(sp.angle)
-				.with_origin(w as f32/2.0, h as f32/2.0);
-
-			rend.add_quad(quad);
-		}
+		rend.add_world(&world);
 
 		wnd.clear(Color::rgb(0.3, 0.5, 1.0));
 		wnd.set_projection();

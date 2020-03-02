@@ -27,11 +27,13 @@ mod font;
 pub use font::{Font, Glyph};
 
 mod renderer;
-pub use renderer::{Renderer, Quad};
+pub use renderer::{Renderer, Quad, Renderable};
 
-pub mod ecs;
+mod ecs;
+pub use ecs::{World, Component, Entity};
 
-//pub mod gui;
+pub use jmge_derive::Component;
+
 
 
 #[derive(Debug)]

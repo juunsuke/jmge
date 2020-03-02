@@ -1,7 +1,60 @@
 
-use super::{ShaderProgram, VertexBuffer, Vertex, Error, Color, Texture};
+use super::{ShaderProgram, VertexBuffer, Vertex, Error, Color, Texture, Component, World};
 use std::rc::Rc;
 
+
+#[derive(Component)]
+pub struct Renderable
+{
+	// Texture to render
+	pub texture: Rc<Texture>,
+
+	// Position
+	pub x: i32,
+	pub y: i32,
+
+	// Color tint
+	pub color: Color,
+
+	// Visibility flag
+	pub visible: bool,
+
+	// Scale
+	pub x_scale: f32,
+	pub y_scale: f32,
+
+	// Origin
+	pub x_origin: i32,
+	pub y_origin: i32,
+
+	// Rotation angle
+	pub angle: f32,
+}
+
+impl Renderable
+{
+	pub fn new(tex: &Rc<Texture>, x: i32, y: i32) -> Renderable
+	{
+		// Create a new renderable with mostly default values
+		Renderable
+		{
+			texture: Rc::clone(tex),
+			x,
+			y,
+			color: Color::rgb(1.0, 1.0, 1.0),
+			visible: true,
+			x_scale: 1.0,
+			y_scale: 1.0,
+			x_origin: 0,
+			y_origin: 0,
+			angle: 0.0,
+		}
+	}
+}
+
+//------------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------------------------------------
 
 pub struct Quad
 {
@@ -163,6 +216,26 @@ impl Renderer
 	{
 		// Add a quad to the queue
 		self.quads.push(quad);
+	}
+
+	pub fn add_world(&mut self, world: &World)
+	{
+		// Add all the renderables from the provided world
+		for (_, rend) in world.iter::<Renderable>()
+		{
+			// Create a quad for the renderable
+			let (w, h) = rend.texture.size();
+
+			let quad = Quad::new(&rend.texture)
+				.with_pos(rend.x as f32, rend.y as f32)
+				.with_size(w as f32, h as f32)
+				.with_color(rend.color)
+				.with_scale(rend.x_scale, rend.y_scale)
+				.with_angle(rend.angle)
+				.with_origin(rend.x_origin as f32, rend.y_origin as f32);
+
+			self.add_quad(quad);
+		}
 	}
 
 	fn write_vb(&mut self)

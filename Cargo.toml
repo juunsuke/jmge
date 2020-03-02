@@ -2,6 +2,7 @@
 
 members = [
 	"jmge",
+	"jmge-derive",
 	"test1",
 ]
 
