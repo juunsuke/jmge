@@ -24,17 +24,23 @@ fn load_canvases() -> (Canvas, Canvas)
 struct RotSpeed (f32);
 
 
-fn main()
+fn run() -> Result<(), Error>
 {
-	let mut wnd = Window::new().unwrap_or_else(|e| oops(e));
-	let mut rend = Renderer::new().unwrap_or_else(|e| oops(e));
+	let mut wnd = Window::new()?;
+	let mut rend = Renderer::new()?;
 
 	let (_cnv1, cnv2) = load_canvases();
 
 	let mut atlas = TextureAtlas::new(2048);
-	let tex = Rc::new(atlas.add(cnv2).unwrap_or_else(|e| oops(e)));
+	let tex = Rc::new(atlas.add(cnv2)?);
 
 
+	let audio = Audio::new()?;
+
+	let sound = Sound::from_file("what.ogg")?;
+	let music = Sound::from_file("Battleship.ogg")?;
+
+	let mut sink = None;
 
 
 	let mut world = World::new();
@@ -82,6 +88,24 @@ fn main()
 			break;
 		}
 
+		if kbd.key_pressed(Key::Q)
+		{
+			sink = None;
+		}
+
+		if kbd.key_pressed(Key::W)
+		{
+			let s = audio.play(&music);
+			s.set_volume(0.3);
+
+			sink = Some(s);
+		}
+
+		if kbd.key_pressed(Key::Space)
+		{
+			audio.play_detached(&sound);
+		}
+
 		rend.add_world(&world);
 
 		wnd.clear(Color::rgb(0.3, 0.5, 1.0));
@@ -91,6 +115,16 @@ fn main()
 
 		wnd.swap();
 	}
+
+	std::mem::drop(sink);
+
+	Ok(())
+}
+
+
+fn main()
+{
+	run().unwrap_or_else(|e| oops(e));
 }
 
 

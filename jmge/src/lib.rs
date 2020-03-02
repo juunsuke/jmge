@@ -31,8 +31,10 @@ pub use renderer::{Renderer, Quad, Renderable};
 
 mod ecs;
 pub use ecs::{World, Component, Entity};
-
 pub use jmge_derive::Component;
+
+mod audio;
+pub use audio::{Audio, Sound, Sink};
 
 
 
@@ -43,6 +45,8 @@ pub enum Error
 	LoadImage (String),
 	PackAtlas,
 	LoadFont (String),
+	NoAudioDevice,
+	LoadSound,
 }
 
 
@@ -56,6 +60,8 @@ impl ToString for Error
 			Error::LoadImage (s)		=> format!("Error loading an image: {}", s),
 			Error::PackAtlas			=> format!("Could not fit a canvas into a texture atlas"),
 			Error::LoadFont (s)			=> format!("Error loading a font: {}", s),
+			Error::NoAudioDevice		=> format!("No audio device found"),
+			Error::LoadSound			=> format!("Error loading a sound file"),
 		}
 	}
 }
