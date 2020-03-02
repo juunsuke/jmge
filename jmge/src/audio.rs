@@ -3,8 +3,7 @@ use super::{Error};
 use std::io::{Seek, SeekFrom, Read};
 use std::sync::Arc;
 
-use rodio::Decoder;
-pub use rodio::Sink;
+use rodio::{Decoder, Sink, Source};
 
 
 pub struct Audio
@@ -22,41 +21,28 @@ impl Audio
 				Some(v) => v,
 				None => return Err(Error::NoAudioDevice),
 			};
-
-		/*let sound = Sound::from_file("Battleship.ogg")?;
-
-		let source = rodio::Decoder::new(&sound.data()[..]).unwrap();
-
-		let sink = rodio::Sink::new(&device);
-
-		sink.pause();
-		sink.append(source);
-		sink.set_volume(0.5);
-		sink.play();
-		sink.detach();
-*/
+		
 		Ok(Audio
 		{
 			device,
 		})
 	}
 
-	pub fn play(&self, snd: &Sound) -> Sink
+	pub fn play(&self, snd: &Sound) -> SoundControl
 	{
 		// Create a sound reader
 		let reader = SoundReader::new(&snd.data);
 
 		// Create a decoder
-		let source = Decoder::new(reader).unwrap();
+		let source = Decoder::new(reader).unwrap().buffered();
 
 		// Create a sink
 		let sink = Sink::new(&self.device);
 
 		// Play the sound
-		sink.set_volume(0.5);
 		sink.append(source);
 
-		sink
+		SoundControl { sink }
 	}
 
 	pub fn play_detached(&self, snd: &Sound)
@@ -65,6 +51,34 @@ impl Audio
 		self.play(snd).detach();
 	}
 }
+
+//------------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------------------------------------
+
+pub struct SoundControl
+{
+	sink: Sink,
+}
+
+impl SoundControl
+{
+	pub fn detach(self)
+	{
+		self.sink.detach();
+	}
+
+	pub fn volume(&self) -> f32
+	{
+		self.sink.volume()
+	}
+
+	pub fn set_volume(&self, vol: f32)
+	{
+		self.sink.set_volume(vol);
+	}
+}
+
 
 //------------------------------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------------------------------
@@ -145,24 +159,6 @@ impl Sound
 {
 	pub fn from_file(fname: &str) -> Result<Sound, Error>
 	{
-	/*
-		// Load and decode the file
-		let file = match std::fs::File::open(fname)
-			{
-				Ok(file) => file,
-				Err(_) => return Err(Error::LoadSound),
-			};
-
-		let dec = match rodio::Decoder::new(std::io::BufReader::new(file))
-			{
-				Ok(dec) => dec,
-				Err(_) => return Err(Error::LoadSound),
-			};
-
-		// Decode the file
-		let data: Vec<i16> = dec.collect();
-	*/
-
 		// Read the file
 		let data = match std::fs::read(fname)
 			{

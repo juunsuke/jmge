@@ -30,11 +30,11 @@ mod renderer;
 pub use renderer::{Renderer, Quad, Renderable};
 
 mod ecs;
-pub use ecs::{World, Component, Entity};
+pub use ecs::{World, Component, Entity, System};
 pub use jmge_derive::Component;
 
 mod audio;
-pub use audio::{Audio, Sound, Sink};
+pub use audio::{Audio, Sound, SoundControl};
 
 
 

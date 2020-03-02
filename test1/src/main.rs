@@ -24,6 +24,26 @@ fn load_canvases() -> (Canvas, Canvas)
 struct RotSpeed (f32);
 
 
+struct RotSys
+{
+	f: f32,
+}
+
+impl System for RotSys
+{
+	fn run(&mut self, world: &World)
+	{
+		self.f += 1.0;
+
+		for (e, mut r) in world.iter_mut::<Renderable>()
+		{
+			let rs = world.get::<RotSpeed>(&e).0;
+			r.angle = self.f*rs/100.0;
+		}
+	}
+}
+
+
 fn run() -> Result<(), Error>
 {
 	let mut wnd = Window::new()?;
@@ -39,7 +59,6 @@ fn run() -> Result<(), Error>
 
 	let sound = Sound::from_file("what.ogg")?;
 	let music = Sound::from_file("Battleship.ogg")?;
-
 	let mut sink = None;
 
 
@@ -68,17 +87,17 @@ fn run() -> Result<(), Error>
 		ents.push(ent);
 	}
 
-	let mut f = 0.0;
+	//let mut f = 0.0;
+
+	let rotater = RotSys { f: 0.0 };
+	world.add_system("rotater", rotater);
 
 	while !wnd.should_close()
 	{
-		f += 1.0;
+		//world.run_once(&mut rotater);
 
-		for (e, mut r) in world.iter_mut::<Renderable>()
-		{
-			let rs = world.get::<RotSpeed>(&e).0;
-			r.angle = f*rs/100.0;
-		}
+		//world.run("rotater");
+		world.run_all();
 
 		wnd.poll_events();
 		
@@ -96,16 +115,32 @@ fn run() -> Result<(), Error>
 		if kbd.key_pressed(Key::W)
 		{
 			let s = audio.play(&music);
-			s.set_volume(0.3);
+			s.set_volume(0.1);
 
 			sink = Some(s);
 		}
 
-		if kbd.key_pressed(Key::Space)
+		if kbd.key_pressed(Key::Space) || wnd.mouse().but_pressed(0)
 		{
 			audio.play_detached(&sound);
 		}
 
+		if kbd.key_pressed(Key::A)
+		{
+			world.set_active("rotater", false);
+		}
+
+		if kbd.key_pressed(Key::S)
+		{
+			world.set_active("rotater", true);
+		}
+
+		if kbd.key_pressed(Key::D)
+		{
+			world.remove_system("rotater");
+		}
+
+		
 		rend.add_world(&world);
 
 		wnd.clear(Color::rgb(0.3, 0.5, 1.0));

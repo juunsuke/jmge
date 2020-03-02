@@ -12,6 +12,11 @@ pub trait Component
 	fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
+pub trait System
+{
+	fn run(&mut self, world: &World);
+}
+
 
 //------------------------------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------------------------------
@@ -262,11 +267,19 @@ impl Clone for Entity
 //------------------------------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------------------------------
 
+struct WorldSystem
+{
+	name: String,
+	active: bool,
+	sys: Box<RefCell<dyn System>>,
+}
+
 pub struct World
 {
 	comps: HashMap<TypeId, CompVec>,
 	ents: Vec<Option<Weak<usize>>>,
 	free_ent: Vec<usize>,
+	systems: Vec<WorldSystem>,
 }
 
 impl World
@@ -278,6 +291,7 @@ impl World
 			comps: HashMap::new(),
 			ents: Vec::new(),
 			free_ent: Vec::new(),
+			systems: Vec::new(),
 		}
 	}
 
@@ -453,6 +467,102 @@ impl World
 		CompIterMut::new(cv, &self.ents)
 	}
 
+	pub fn run_once(&mut self, sys: &mut impl System)
+	{
+		// Run the system
+		sys.run(self);
+	}
 
+	fn find_system_index(&self, name: &str) -> Option<usize>
+	{
+		// Find the system with the given name
+		for (i, ws) in self.systems.iter().enumerate()
+		{
+			if ws.name==name
+				{ return Some(i); }
+		}
+
+		None
+	}
+
+	fn find_system(&self, name: &str) -> Option<&WorldSystem>
+	{
+		// Find the system with the given name
+		for ws in self.systems.iter()
+		{
+			if ws.name==name
+				{ return Some(ws); }
+		}
+
+		None
+	}
+
+	fn find_system_mut(&mut self, name: &str) -> Option<&mut WorldSystem>
+	{
+		// Find the system with the given name
+		for ws in self.systems.iter_mut()
+		{
+			if ws.name==name
+				{ return Some(ws); }
+		}
+
+		None
+	}
+
+	pub fn add_system(&mut self, name: &str, sys: impl System+'static)
+	{
+		// Add a new system
+
+		// Look for duplicates
+		if let Some(_) = self.find_system(name)
+		{
+			panic!("duplicate system name");
+		}
+
+		// Add it
+		let ws = WorldSystem
+			{
+				name: String::from(name),
+				active: true,
+				sys: Box::new(RefCell::new(sys)),
+			};
+
+		self.systems.push(ws);
+	}
+
+	pub fn run(&self, name: &str)
+	{
+		// Find the system and run it
+		let ws = self.find_system(name).expect("no such system");
+		ws.sys.borrow_mut().run(self);
+	}
+
+	pub fn run_all(&self)
+	{
+		// Run all the systems
+		for ws in self.systems.iter().filter(|ws| ws.active)
+		{
+			ws.sys.borrow_mut().run(self);
+		}
+	}
+
+	pub fn is_active(&self, name: &str) -> bool
+	{
+		// Check wether a system is active
+		self.find_system(name).expect("no such system").active
+	}
+
+	pub fn set_active(&mut self, name: &str, active: bool)
+	{
+		// Activate/deactivate a system
+		self.find_system_mut(name).expect("no such system").active = active;
+	}
+
+	pub fn remove_system(&mut self, name: &str)
+	{
+		// Find and remove a system
+		let i = self.find_system_index(name).expect("no such system");
+		self.systems.remove(i);
+	}
 }
 
