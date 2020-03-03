@@ -1,6 +1,25 @@
 
-use super::{ShaderProgram, VertexBuffer, Vertex, Error, Color, Texture, Component, World};
+use super::{ShaderProgram, VertexBuffer, Error, Color, Texture, Component, World};
 use std::rc::Rc;
+use nalgebra::base::Matrix4;
+
+
+#[repr(C)]
+struct Vertex
+{
+	pub x: f32,
+	pub y: f32,
+	pub col: u32,
+	pub u: f32,
+	pub v: f32,
+	pub tx: f32,
+	pub ty: f32,
+	pub sx: f32,
+	pub sy: f32,
+	pub angle: f32,
+	pub ox: f32,
+	pub oy: f32,
+}
 
 
 #[derive(Component)]
@@ -197,8 +216,12 @@ impl Renderer
 {
 	pub fn new() -> Result<Renderer, Error>
 	{
-		// Create the default shader and VBO
-		let shader = ShaderProgram::new_default()?;
+		// Create the shader and VBO
+		let shader = ShaderProgram::from_str(
+			include_str!("../shaders/renderable.vert"),
+			include_str!("../shaders/renderable.frag")
+		)?;
+
 		let vb = VertexBuffer::new();
 
 		// Create the renderer
@@ -271,14 +294,17 @@ impl Renderer
 		count
 	}
 
-	pub fn render(&mut self)
+	pub fn render(&mut self, proj_mat: &Matrix4<f32>)
 	{
 		// Build the vertex buffer data
 		self.write_vb();
 
-		// Draw the quads
+		// Set the projection matrix
 		self.shader.enable();
+		self.shader.set_uniform_matrix("Projection", proj_mat);
 
+
+		// Draw the quads
 		let mut pos = 0;
 		let len = self.quads.len();
 

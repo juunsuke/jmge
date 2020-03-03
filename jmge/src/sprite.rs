@@ -131,6 +131,8 @@ pub struct Sprite
 	cur_tex: Rc<Texture>,
 	cur_dur: i64,
 	last_time: i64,
+	next_tag: Option<String>,
+	rolled: bool,
 }
 
 impl Sprite
@@ -153,13 +155,36 @@ impl Sprite
 			cur_tex: tex,
 			cur_dur: dur as i64,
 			last_time: 0,
+			next_tag: None,
+			rolled: false,
 		}
 	}
+	
+	pub fn set_tag(&mut self, tag: &str)
+	{
+		// Change the current tag
+		let (from, to) = self.ss.get_tag(tag);
+		let (tex, dur) = self.ss.get_frame(from);
 
-	pub fn process(&mut self, time: i64) -> (bool, bool)
+		self.from = from;
+		self.to = to;
+		self.pos = from;
+		self.cur_tex = tex;
+		self.cur_dur = dur as i64;
+		self.last_time = 0;
+		self.next_tag = None;
+	}
+
+	pub fn set_next_tag(&mut self, next_tag: &str)
+	{
+		// Set the next tag
+		self.next_tag = Some(String::from(next_tag));
+	}
+
+	pub fn process(&mut self, time: i64) -> bool
 	{
 		// Process the animation
-		let mut roll_over = false;
+		self.rolled = false;
 		let mut changed = false;
 
 		// Advance to the next frame ?
@@ -171,8 +196,15 @@ impl Sprite
 			if self.pos==self.to
 			{
 				// Roll over
+				self.rolled = true;
 				self.pos = self.from;
-				roll_over = true;
+
+				// Change the tag ?
+				if let Some(next_tag) = self.next_tag.take()
+				{
+					// Yes
+					self.set_tag(&next_tag);
+				}
 			}
 			else
 			{
@@ -201,7 +233,7 @@ impl Sprite
 
 		}
 
-		(changed, roll_over)
+		changed
 	}
 
 	pub fn get_texture(&self) -> Rc<Texture>
@@ -214,6 +246,22 @@ impl Sprite
 	{
 		// Current tag name
 		self.cur_tag.clone()
+	}
+
+	pub fn next_tag(&self) -> Option<String>
+	{
+		// Queued next tag
+		match &self.next_tag
+		{
+			Some (s) => Some(s.clone()),
+			None => None,
+		}
+	}
+
+	pub fn rolled(&self) -> bool
+	{
+		// Rolled over flag
+		self.rolled
 	}
 }
 
@@ -245,7 +293,7 @@ impl System for SpriteSystem
 		for (e, mut sp) in world.iter_mut::<Sprite>()
 		{
 			// Process it
-			let (changed, _) = sp.process(time);
+			let changed = sp.process(time);
 
 			// Update the renderable if the texture changed
 			if changed

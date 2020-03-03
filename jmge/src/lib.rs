@@ -9,7 +9,7 @@ mod shader;
 pub use shader::{VertexShader, FragmentShader, ShaderProgram};
 
 mod vbo;
-pub use vbo::{VertexBuffer, Vertex};
+pub use vbo::{VertexBuffer};
 
 mod texture;
 pub use texture::{Texture, RawTexture, TextureAtlas};

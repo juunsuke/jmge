@@ -13,10 +13,10 @@ pub enum Texture
 
 impl Texture
 {
-	pub fn from_canvas(cnv: &Canvas) -> Texture
+	pub fn from_canvas(cnv: &Canvas, smooth: bool) -> Texture
 	{
 		// Shortcut for creating a raw texture
-		Texture::Raw(Rc::new(RefCell::new(RawTexture::from_canvas(cnv))))
+		Texture::Raw(Rc::new(RefCell::new(RawTexture::from_canvas(cnv, smooth))))
 	}
 
 	pub fn size(&self) -> (u32, u32)
@@ -86,7 +86,7 @@ pub struct RawTexture
 
 impl RawTexture
 {
-	pub fn new(w: u32, h: u32) -> RawTexture
+	pub fn new(w: u32, h: u32, smooth: bool) -> RawTexture
 	{
 		// Create an OpenGL texture
 		let mut id = 0;
@@ -98,10 +98,10 @@ impl RawTexture
 
 			// Bind it and set its parameters
 			gl::BindTexture(gl::TEXTURE_2D, id);
-			//gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
-			//gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
-			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
-			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+
+			let v = if smooth { gl::LINEAR } else { gl::NEAREST } as i32;
+			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, v);
+			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, v);
 			
 			// Create the store
 			gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as i32, w as i32, h as i32, 0, gl::RGBA, gl::UNSIGNED_BYTE, std::ptr::null());
@@ -115,13 +115,13 @@ impl RawTexture
 		}
 	}
 
-	pub fn from_canvas(cnv: &Canvas) -> RawTexture
+	pub fn from_canvas(cnv: &Canvas, smooth: bool) -> RawTexture
 	{
 		// Get the size
 		let (w, h) = cnv.size();
 
 		// Create the OpenGL texture
-		let tex = RawTexture::new(w, h);
+		let tex = RawTexture::new(w, h, smooth);
 
 		// Upload the data to it
 		unsafe
@@ -133,12 +133,12 @@ impl RawTexture
 		tex
 	}
 
-	pub fn from_file(fname: &str) -> Result<RawTexture, Error>
+	pub fn from_file(fname: &str, smooth: bool) -> Result<RawTexture, Error>
 	{
 		// Load the file into a canvas and create a texture from it
 		let cnv = Canvas::from_file(fname)?;
 
-		Ok(RawTexture::from_canvas(&cnv))
+		Ok(RawTexture::from_canvas(&cnv, smooth))
 	}
 
 	pub fn size(&self) -> (u32, u32)
@@ -223,10 +223,10 @@ fn create_packer(size: u32) -> Packer
 
 impl TextureAtlas
 {
-	pub fn new(size: u32) -> TextureAtlas
+	pub fn new(size: u32, smooth: bool) -> TextureAtlas
 	{
 		// Create a new raw texture
-		let raw_tex = Rc::new(RawTexture::new(size, size));
+		let raw_tex = Rc::new(RawTexture::new(size, size, smooth));
 
 		// Create the atlas
 		TextureAtlas
@@ -296,10 +296,10 @@ impl TextureAtlas
 		}
 	}
 
-	pub fn resize(&mut self, size: u32) -> Result<(), Error>
+	pub fn resize(&mut self, size: u32, smooth: bool) -> Result<(), Error>
 	{
 		// Create a new texture with the new size
-		self.tex = Rc::new(RawTexture::new(size, size));
+		self.tex = Rc::new(RawTexture::new(size, size, smooth));
 		self.size = size;
 
 		// Re-create the packer

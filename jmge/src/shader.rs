@@ -144,11 +144,6 @@ impl ShaderProgram
 		ShaderProgram::new(vert, frag)
 	}
 
-	pub fn new_default() -> Result<ShaderProgram, Error>
-	{
-		ShaderProgram::from_str(include_str!("../shaders/def.vert"), include_str!("../shaders/def.frag"))
-	}
-	
 	pub fn id(&self) -> u32
 	{
 		self.0

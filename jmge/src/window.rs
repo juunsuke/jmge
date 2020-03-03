@@ -1,5 +1,5 @@
 
-use super::{Color, ShaderProgram, Error, Input, Mouse, Keyboard};
+use super::{Color, Error, Input, Mouse, Keyboard};
 use glfw::{Context, WindowEvent};
 use nalgebra::base::Matrix4;
 use std::time::{Instant};
@@ -7,7 +7,6 @@ use std::time::{Instant};
 pub struct Window
 {
 	proj_mat: Matrix4<f32>,
-	shader: ShaderProgram,
 
 	input: Input,
 
@@ -15,6 +14,7 @@ pub struct Window
 	frame_tot: u64,
 	last_time: Instant,
 	fps: f32,
+	vsync: bool,
 	
 	window: glfw::Window,
 	events: std::sync::mpsc::Receiver<(f64, glfw::WindowEvent)>,
@@ -66,30 +66,21 @@ impl Window
 		// Prepare the projection matrix
 		let proj_mat = calc_proj(w as f32, h as f32);
 
-		let shader = ShaderProgram::new_default()?;
-		shader.enable();
-
 		let wnd = Window
 		{
 			glfw,
 			window,
 			events,
 			proj_mat,
-			shader,
 			frame: 0,
 			frame_tot: 0,
 			last_time: Instant::now(),
 			fps: 0.0,
 			input: Input::new(),
+			vsync: true,
 		};
 
 		Ok(wnd)
-	}
-
-	pub fn set_projection(&self)
-	{
-		// Set the projection matrix
-		self.shader.set_uniform_matrix("Projection", &self.proj_mat);
 	}
 
 	pub fn swap(&mut self)
@@ -163,6 +154,27 @@ impl Window
 		}
 	}
 
+	pub fn set_vsync(&mut self, vsync: bool)
+	{
+		// Set vsync
+		if vsync
+		{
+			self.glfw.set_swap_interval(glfw::SwapInterval::Sync(1));
+		}
+		else
+		{
+			self.glfw.set_swap_interval(glfw::SwapInterval::None);
+		}
+
+		self.vsync = vsync;
+	}
+
+	pub fn vsync(&self) -> bool
+	{
+		// Get vsync
+		self.vsync
+	}
+
 	pub fn should_close(&self) -> bool
 	{
 		self.window.should_close()
@@ -201,6 +213,11 @@ impl Window
 	pub fn keyboard(&self) -> &Keyboard
 	{
 		self.input.keyboard()
+	}
+
+	pub fn projection_matrix(&self) -> &Matrix4<f32>
+	{
+		&self.proj_mat
 	}
 }
 
