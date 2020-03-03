@@ -7,17 +7,16 @@ use std::cell::RefCell;
 
 pub enum Texture
 {
-	Raw (RefCell<RawTexture>),
+	Raw (Rc<RefCell<RawTexture>>),
 	AtlasEntry (Rc<RefCell<AtlasEntry>>),
 }
-
 
 impl Texture
 {
 	pub fn from_canvas(cnv: &Canvas) -> Texture
 	{
 		// Shortcut for creating a raw texture
-		Texture::Raw(RefCell::new(RawTexture::from_canvas(cnv)))
+		Texture::Raw(Rc::new(RefCell::new(RawTexture::from_canvas(cnv))))
 	}
 
 	pub fn size(&self) -> (u32, u32)
@@ -99,8 +98,10 @@ impl RawTexture
 
 			// Bind it and set its parameters
 			gl::BindTexture(gl::TEXTURE_2D, id);
-			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
-			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+			//gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+			//gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
+			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
 			
 			// Create the store
 			gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as i32, w as i32, h as i32, 0, gl::RGBA, gl::UNSIGNED_BYTE, std::ptr::null());

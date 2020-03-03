@@ -1,100 +1,116 @@
 
-use super::{Color, Vertex, Texture, VertexBuffer};
-use nalgebra::base::{Matrix4, Vector3};
-use std::rc::{Rc, Weak};
-use std::cell::RefCell;
+use super::{Error, Canvas, Texture, TextureAtlas, Component, System, World, Renderable};
+use std::collections::HashMap;
+use std::rc::Rc;
+use std::time::Instant;
 
 
-pub struct SpriteMetrics
+struct Frame
 {
-	pub x: i32,
-	pub y: i32,
-	pub w: u32,
-	pub h: u32,
-	pub col: Color,
-	pub sx: f32,
-	pub sy: f32,
-	pub angle: f32,
-	pub ox: i32,
-	pub oy: i32,
+	tex: Rc<Texture>,
+	dur: u32,
 }
 
-fn write_vertex(vtx: &mut Vertex, sm: &SpriteMetrics, x: f32, y: f32, u: f32, v: f32)
+struct Tag
 {
-	// Write vertex data
-	vtx.x = x;
-	vtx.y = y;
-	vtx.col = sm.col.0;
-	vtx.u = u;
-	vtx.v = v;
-	vtx.tx = sm.x as f32;
-	vtx.ty = sm.y as f32;
-	vtx.sx = sm.sx;
-	vtx.sy = sm.sy;
-	vtx.angle = sm.angle;
-	vtx.ox = -sm.ox as f32;
-	vtx.oy = -sm.oy as f32;
+	from: usize,
+	to: usize,
 }
 
-impl SpriteMetrics
-{
 
-	pub fn new() -> SpriteMetrics
+pub struct SpriteSheet
+{
+	frames: Vec<Frame>,
+	tags: HashMap<String, Tag>,
+}
+
+impl SpriteSheet
+{
+	pub fn from_file(fname: &str, cnv: &Canvas, atlas: &mut TextureAtlas) -> Result<SpriteSheet, Error>
 	{
-		// Default values
-		SpriteMetrics
+		// Load the file
+		let s = match std::fs::read_to_string(fname)
+			{
+				Ok (s) => s,
+				Err (_) => return Err(Error::LoadSpriteSheet("Could not read the file".to_string())),
+			};
+
+		// Parse it
+		let json = match json::parse(&s)
+			{
+				Ok (json) => json,
+				Err (_) => return Err(Error::LoadSpriteSheet("Error parsing JSON data".to_string())),
+			};
+
+		// Extract the frames
+		let mut frames = Vec::new();
+
+		for f in json["frames"].members()
 		{
-			x: 0,
-			y: 0,
-			w: 0,
-			h: 0,
-			col: Color::rgba(1.0, 1.0, 1.0, 1.0),
-			sx: 1.0,
-			sy: 1.0,
-			angle: 0.0,
-			ox: 0,
-			oy: 0,
+			//let file = f["filename"].as_str().unwrap();
+			let x = *&f["frame"]["x"].as_u32().unwrap();
+			let y = *&f["frame"]["y"].as_u32().unwrap();
+			let w = *&f["frame"]["w"].as_u32().unwrap();
+			let h = *&f["frame"]["h"].as_u32().unwrap();
+			let dur = *&f["duration"].as_u32().unwrap();
+
+			// Create a sub-canvas and an atlas texture entry
+			let sub = cnv.sub(x, y, w, h);
+			let tex = Rc::new(atlas.add(sub)?);
+
+			// Create a frame
+			let frame = Frame
+				{
+					tex,
+					dur,
+				};
+
+			frames.push(frame);
 		}
+
+		// Extract the tags
+		let mut tags = HashMap::new();
+
+		for t in json["meta"]["frameTags"].members()
+		{
+			let name = t["name"].as_str().unwrap();
+			let from = t["from"].as_usize().unwrap();
+			let to = t["to"].as_usize().unwrap();
+
+			if from>to || to>=frames.len()
+				{ return Err(Error::LoadSpriteSheet("Inconsistant tag info".to_string())); }
+
+			// Create a tag
+			let tag = Tag
+				{
+					from,
+					to,
+				};
+
+			tags.insert(name.to_string(), tag);
+		}
+
+
+		Ok(SpriteSheet
+			{
+				frames,
+				tags,
+			}
+		)
 	}
 
-	pub fn write_vertices(&self, v: &mut [Vertex], uv: (f32, f32, f32, f32))
+	pub fn get_frame(&self, i: usize) -> (Rc<Texture>, u32)
 	{
-		let x1 = 0.0;
-		let y1 = 0.0;
-		let x2 = self.w as f32;
-		let y2 = self.h as f32;
-		let (u1, v1, u2, v2) = uv;
-
-		// First triangle
-		write_vertex(&mut v[0], self, x1, y1, u1, v1);
-		write_vertex(&mut v[1], self, x2, y1, u2, v1);
-		write_vertex(&mut v[2], self, x1, y2, u1, v2);
-
-		// Second triangle
-		write_vertex(&mut v[3], self, x2, y1, u2, v1);
-		write_vertex(&mut v[4], self, x2, y2, u2, v2);
-		write_vertex(&mut v[5], self, x1, y2, u1, v2);
+		// Get a reference to a frame
+		(Rc::clone(&self.frames[i].tex), self.frames[i].dur)
 	}
 
-	pub fn calc_transform_matrix(&self) -> Matrix4<f32>
+	pub fn get_tag(&self, name: &str) -> (usize, usize)
 	{
-		// Build a transformation matrix using the metrics
+		// Get a reference to a tag
+		let tag = self.tags.get(name).expect("no such tag in the spritesheet");
 
-		// Translation
-		let mut mat = Matrix4::new_translation(&Vector3::new(self.x as f32, self.y as f32, 0.0));
-
-		// Rotation
-		if self.angle!=0.0
-			{ mat *= Matrix4::from_axis_angle(&Vector3::z_axis(), self.angle); }
-
-		// Scale
-		if self.sx!=1.0 || self.sy!=1.0
-			{ mat *= Matrix4::new_nonuniform_scaling(&Vector3::new(self.sx, self.sy, 1.0)); }
-
-		// Origin translation
-		mat *= Matrix4::new_translation(&Vector3::new(-self.ox as f32, -self.oy as f32, 0.0));
-
-		mat
+		(tag.from, tag.to)
 	}
 }
 
@@ -103,210 +119,142 @@ impl SpriteMetrics
 //------------------------------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------------------------------
 
+
+#[derive(Component)]
 pub struct Sprite
 {
-	metrics: SpriteMetrics,
-	tex: Rc<Texture>,
-	visible: bool,
+	ss: Rc<SpriteSheet>,
+	cur_tag: String,
+	from: usize,
+	to: usize,
+	pos: usize,
+	cur_tex: Rc<Texture>,
+	cur_dur: i64,
+	last_time: i64,
 }
 
 impl Sprite
 {
-	pub fn new(tex: &Rc<Texture>) -> Sprite
+	pub fn new(ss: &Rc<SpriteSheet>, tag: &str) -> Sprite
 	{
-		// Setup the metrics
-		let (w, h) = tex.size();
+		// Create a new sprite based on the given spritesheet
 
-		let mut metrics = SpriteMetrics::new();
-		metrics.w = w;
-		metrics.h = h;
-		
+		// Get the initial tag
+		let (from, to) = ss.get_tag(tag);
+		let (tex, dur) = ss.get_frame(from);
+
 		Sprite
 		{
-			metrics,
-			tex: Rc::clone(tex),
-			visible: true,
+			ss: Rc::clone(ss),
+			cur_tag: String::from(tag),
+			from,
+			to,
+			pos: from,
+			cur_tex: tex,
+			cur_dur: dur as i64,
+			last_time: 0,
 		}
 	}
 
-	pub fn set_pos(&mut self, x: i32, y: i32)
+	pub fn process(&mut self, time: i64) -> (bool, bool)
 	{
-		self.metrics.x = x;
-		self.metrics.y = y;
-	}
+		// Process the animation
+		let mut roll_over = false;
+		let mut changed = false;
 
-	pub fn set_color(&mut self, col: Color)
-	{
-		self.metrics.col = col;
-	}
-
-	pub fn set_scale(&mut self, sx: f32, sy: f32)
-	{
-		self.metrics.sx = sx;
-		self.metrics.sy = sy;
-	}
-
-	pub fn set_angle(&mut self, angle: f32)
-	{
-		self.metrics.angle = angle;
-	}
-
-	pub fn set_origin(&mut self, ox: i32, oy: i32)
-	{
-		self.metrics.ox = ox;
-		self.metrics.oy = oy;
-	}
-
-	pub fn set_texture(&mut self, tex: &Rc<Texture>)
-	{
-		let (w, h) = tex.size();
-		self.metrics.w = w;
-		self.metrics.h = h;
-		self.tex = Rc::clone(tex);
-	}
-
-	pub fn set_visible(&mut self, vis: bool)
-	{
-		self.visible = vis;
-	}
-
-	pub fn show(&mut self)
-	{
-		self.set_visible(true);
-	}
-
-	pub fn hide(&mut self)
-	{
-		self.set_visible(false);
-	}
-
-	pub fn pos(&self) -> (i32, i32)				{ (self.metrics.x, self.metrics.y) }
-	pub fn size(&self) -> (u32, u32)			{ (self.metrics.w, self.metrics.h) }
-	pub fn color(&self) -> Color				{ self.metrics.col }
-	pub fn scale(&self) -> (f32, f32)			{ (self.metrics.sx, self.metrics.sy) }
-	pub fn angle(&self) -> f32					{ self.metrics.angle }
-	pub fn origin(&self) -> (i32, i32)			{ (self.metrics.ox, self.metrics.oy) }
-	pub fn texture(&self) -> Rc<Texture>		{ Rc::clone(&self.tex) }
-	pub fn visible(&self) -> bool				{ self.visible }
-}
-
-//------------------------------------------------------------------------------------------------------------------------
-//------------------------------------------------------------------------------------------------------------------------
-//------------------------------------------------------------------------------------------------------------------------
-
-pub struct SpriteBatch
-{
-	sprites: Vec<Weak<RefCell<Sprite>>>,
-	vbo: VertexBuffer<Vertex>,
-}
-
-struct DrawBatch
-{
-	tex: Rc<Texture>,
-	first: u32,
-	count: u32,
-}
-
-impl SpriteBatch
-{
-
-	pub fn new() -> SpriteBatch
-	{
-		SpriteBatch
+		// Advance to the next frame ?
+		if (time-self.last_time) >= self.cur_dur
 		{
-			sprites: Vec::new(),
-			vbo: VertexBuffer::new(),
-		}
-	}
+			// Yes
+			changed = true;
 
-	pub fn add(&mut self, sp: Sprite) -> Rc<RefCell<Sprite>>
-	{
-		// Add a sprite to the vector
-		let sp = Rc::new(RefCell::new(sp));
-		self.sprites.push(Rc::downgrade(&sp));
-
-		// Return an Rc copy
-		sp
-	}
-
-	pub fn draw(&mut self)
-	{
-		// Remove all the dead sprites
-		self.sprites.retain(|sp| sp.strong_count()>0);
-
-		// Prepare batching
-		let mut last_tex: Option<Rc<Texture>> = None;
-		let mut batches = Vec::new();
-		let mut pos = 0;
-		let mut start = 0;
-
-		{
-			// Map the VBO, large enough for all the sprites
-			//let mut vtx = unsafe { self.vbo.map(0, self.sprites.len()*6) };
-			let mut map = self.vbo.map(self.sprites.len()*6);
-
-			// Iterate through all the sprites
-			for sp in self.sprites.iter()
+			if self.pos==self.to
 			{
-				let spcell = sp.upgrade().unwrap();
-				let sp = spcell.borrow();
+				// Roll over
+				self.pos = self.from;
+				roll_over = true;
+			}
+			else
+			{
+				self.pos += 1;
+			}
 
-				if sp.visible
+			// Adjust the time
+			let diff = (time-self.last_time) - self.cur_dur;
+
+			if diff>self.cur_dur
+			{
+				// Probly the first process, or a super lag
+				// Either way, reset to current time
+				self.last_time = time;
+			}
+			else
+			{
+				// Adjust for proper timing
+				self.last_time = time-diff;
+			}
+			
+			// Get the new frame info
+			let (tex, dur) = self.ss.get_frame(self.pos);
+			self.cur_tex = tex;
+			self.cur_dur = dur as i64;
+
+		}
+
+		(changed, roll_over)
+	}
+
+	pub fn get_texture(&self) -> Rc<Texture>
+	{
+		// Get the current frame texture
+		Rc::clone(&self.cur_tex)
+	}
+
+	pub fn cur_tag(&self) -> String
+	{
+		// Current tag name
+		self.cur_tag.clone()
+	}
+}
+
+
+pub struct SpriteSystem
+{
+	time: Instant,
+}
+
+impl SpriteSystem
+{
+	pub fn new() -> SpriteSystem
+	{
+		SpriteSystem
+		{
+			time: Instant::now(),
+		}
+	}
+}
+
+impl System for SpriteSystem
+{
+	fn run(&mut self, world: &World)
+	{
+		// Get the time
+		let time = self.time.elapsed().as_millis() as i64;
+
+		// Process all the sprites
+		for (e, mut sp) in world.iter_mut::<Sprite>()
+		{
+			// Process it
+			let (changed, _) = sp.process(time);
+
+			// Update the renderable if the texture changed
+			if changed
+			{
+				if let Some(mut rend) = world.try_get_mut::<Renderable>(&e)
 				{
-					// Create a new draw batch if the texture is different
-					if let Some(ref tex) = last_tex
-					{
-						if !tex.is_same(&sp.tex)
-						{
-							let batch = DrawBatch
-								{
-									tex: Rc::clone(tex),
-									first: start,
-									count: pos-start,
-								};
-
-							batches.push(batch);
-
-							// Start a new one
-							last_tex = Some(Rc::clone(&sp.tex));
-							start = pos;
-						}
-					}
-					else
-					{
-						// First one
-						last_tex = Some(Rc::clone(&sp.tex));
-					}
-
-					// Write the vertices
-					//sp.metrics.write_vertices(map.slice(pos as usize*6, 6), sp.tex.uv());
-					sp.metrics.write_vertices(&mut map[pos as usize*6..(pos+1) as usize*6], sp.tex.uv());
-
-					// Move on
-					pos += 1;
+					rend.texture = sp.get_texture();
 				}
 			}
-
-			// Create the final batch
-			if let Some(ref tex) = last_tex
-			{
-				let batch = DrawBatch
-					{
-						tex: Rc::clone(tex),
-						first: start,
-						count: pos-start,
-					};
-
-				batches.push(batch);
-			}
-		}
-
-		// Draw all the batches
-		for batch in batches
-		{
-			//println!("Batch : first: {}  count: {}", batch.first, batch.count);
-			batch.tex.enable();
-			self.vbo.draw_triangles(batch.first*6, batch.count*6);
 		}
 	}
 }

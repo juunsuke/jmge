@@ -11,15 +11,6 @@ fn oops(e: Error) -> !
 }
 
 
-fn load_canvases() -> (Canvas, Canvas)
-{
-	let c1 = Canvas::from_memory_file(include_bytes!("../../kanade.png")).unwrap_or_else(|e| oops(e));
-	let c2 = Canvas::from_memory_file(include_bytes!("../../kanade2.png")).unwrap_or_else(|e| oops(e));
-
-	(c1, c2)
-}
-
-
 #[derive(Component)]
 struct RotSpeed (f32);
 
@@ -37,8 +28,10 @@ impl System for RotSys
 
 		for (e, mut r) in world.iter_mut::<Renderable>()
 		{
-			let rs = world.get::<RotSpeed>(&e).0;
-			r.angle = self.f*rs/100.0;
+			if let Some(rs) = world.try_get::<RotSpeed>(&e)
+			{
+				r.angle = self.f*rs.0/100.0;
+			}
 		}
 	}
 }
@@ -49,15 +42,20 @@ fn run() -> Result<(), Error>
 	let mut wnd = Window::new()?;
 	let mut rend = Renderer::new()?;
 
-	let (_cnv1, cnv2) = load_canvases();
+	let _cnv1 = Canvas::from_memory_file(include_bytes!("../../kanade.png"))?;
+	let cnv2 = Canvas::from_memory_file(include_bytes!("../../kanade2.png"))?;
+	let cnv3 = Canvas::from_memory_file(include_bytes!("../../adventurer.png"))?;
 
 	let mut atlas = TextureAtlas::new(2048);
 	let tex = Rc::new(atlas.add(cnv2)?);
 
 
+	let ss = Rc::new(SpriteSheet::from_file("adventurer.json", &cnv3, &mut atlas)?);
+
+
 	let audio = Audio::new()?;
 
-	let sound = Sound::from_file("what.ogg")?;
+	let sound = Sound::from_file("what.wav")?;
 	let music = Sound::from_file("Battleship.ogg")?;
 	let mut sink = None;
 
@@ -65,6 +63,7 @@ fn run() -> Result<(), Error>
 	let mut world = World::new();
 	world.register::<Renderable>();
 	world.register::<RotSpeed>();
+	world.register::<Sprite>();
 
 
 	let (tw, th) = tex.size();
@@ -91,6 +90,20 @@ fn run() -> Result<(), Error>
 
 	let rotater = RotSys { f: 0.0 };
 	world.add_system("rotater", rotater);
+
+
+	let sp = Sprite::new(&ss, "attack1");
+	let mut r = Renderable::new(&sp.get_texture(), 500, 400);
+	r.x_scale = 4.0;
+	r.y_scale = 4.0;
+	
+	let adv = world.new_entity();
+	world.set(&adv, r);
+	world.set(&adv, sp);
+
+
+	world.add_system("sprite", SpriteSystem::new());
+
 
 	while !wnd.should_close()
 	{
