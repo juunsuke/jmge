@@ -36,6 +36,9 @@ pub use audio::{Audio, Sound, SoundControl};
 mod sprite;
 pub use sprite::{SpriteSheet, Sprite, SpriteSystem};
 
+mod tilemap;
+pub use tilemap::{TileMap, TileMapRenderer};
+
 
 
 #[derive(Debug)]

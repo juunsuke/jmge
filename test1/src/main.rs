@@ -105,6 +105,14 @@ fn run() -> Result<(), Error>
 	world.add_system("sprite", SpriteSystem::new());
 
 
+
+	let ts = Rc::new(Texture::from_file("tileset.png", false)?);
+	let tm = TileMap::new(32, 32, 16, 16, &ts);
+
+
+	let tmr = TileMapRenderer::new()?;
+
+
 	while !wnd.should_close()
 	{
 		//world.run_once(&mut rotater);

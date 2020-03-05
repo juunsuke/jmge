@@ -19,6 +19,11 @@ impl Texture
 		Texture::Raw(Rc::new(RefCell::new(RawTexture::from_canvas(cnv, smooth))))
 	}
 
+	pub fn from_file(fname: &str, smooth: bool) -> Result<Texture, Error>
+	{
+		Ok(Texture::Raw(Rc::new(RefCell::new(RawTexture::from_file(fname, smooth)?))))
+	}
+
 	pub fn size(&self) -> (u32, u32)
 	{
 		// Return the texture size
